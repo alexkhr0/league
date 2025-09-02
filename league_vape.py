@@ -772,71 +772,71 @@ async def auto_pair_and_post():
 
     # After creating auto matches, recompute "all matches" for posting
     # --- Cross-region pairing (EU <-> USA) ---
-# Build "matched_today" after the within-region pairing above
-matched_today = set()
-for m in data.get("matches", {}).values():
-    if m.get("week") == wk and m.get("day") == today_day:
-        if m.get("p1"):
-            matched_today.add(m["p1"])
-        if m.get("p2"):
-            matched_today.add(m["p2"])
+    # Build "matched_today" after the within-region pairing above
+    matched_today = set()
+    for m in data.get("matches", {}).values():
+        if m.get("week") == wk and m.get("day") == today_day:
+            if m.get("p1"):
+                matched_today.add(m["p1"])
+            if m.get("p2"):
+                matched_today.add(m["p2"])
 
-# Who is still unmatched today?
-still_unmatched = [u for u in signed if u not in matched_today]
+    # Who is still unmatched today?
+    still_unmatched = [u for u in signed if u not in matched_today]
 
-# Split leftovers by region (NA is normalized to "USA")
-eu_left = [u for u in still_unmatched if (data.get("users", {}).get(u) or {}).get("region") == "EU"]
-us_left = [u for u in still_unmatched if (data.get("users", {}).get(u) or {}).get("region") == "USA"]
+    # Split leftovers by region (NA is normalized to "USA")
+    eu_left = [u for u in still_unmatched if (data.get("users", {}).get(u) or {}).get("region") == "EU"]
+    us_left = [u for u in still_unmatched if (data.get("users", {}).get(u) or {}).get("region") == "USA"]
 
-import random
-random.shuffle(eu_left)
-random.shuffle(us_left)
+    import random
+    random.shuffle(eu_left)
+    random.shuffle(us_left)
 
-def pick_partner(a, pool):
-    """Prefer someone you haven't played recently; else take any."""
-    for b in pool:
-        if a == b:
-            continue
-        try:
-            if not played_recently(a, b, REMATCH_BLOCK_DAYS, data):
+    def pick_partner(a, pool):
+        """Prefer someone you haven't played recently; else take any."""
+        for b in pool:
+            if a == b:
+                continue
+            try:
+                if not played_recently(a, b, REMATCH_BLOCK_DAYS, data):
+                    return b
+            except Exception:
                 return b
-        except Exception:
-            return b
-    # No fresh opponent? allow a rematch
-    return pool[0] if pool else None
+        # No fresh opponent? allow a rematch
+        return pool[0] if pool else None
 
-def create_pair(a, b):
-    if not a or not b or a == b:
-        return
-    mid = str(uuid.uuid4())[:8]
-    match = {
-        "id": mid,
-        "p1": a,
-        "p2": b,
-        "day": today_day,
-        "week": wk,
-        "reported_by": None,
-        "score": None,
-        "confirmed": False,
-        "timestamp": datetime.now(TIMEZONE).isoformat(),
-        "forced": True
-    }
-    data.setdefault("matches", {})[mid] = match
-    suggestions.append((a, b, mid))
+    def create_pair(a, b):
+        if not a or not b or a == b:
+            return
+        mid = str(uuid.uuid4())[:8]
+        match = {
+            "id": mid,
+            "p1": a,
+            "p2": b,
+            "day": today_day,
+            "week": wk,
+            "reported_by": None,
+            "score": None,
+            "confirmed": False,
+            "timestamp": datetime.now(TIMEZONE).isoformat(),
+            "forced": True
+        }
+        data.setdefault("matches", {})[mid] = match
+        suggestions.append((a, b, mid))
 
-# Cross-pair to fix imbalances (both directions)
-used = set()
-for primary, secondary in ((eu_left, us_left), (us_left, eu_left)):
-    for a in list(primary):
-        if a in used:
-            continue
-        candidates = [b for b in secondary if b not in used]
-        if not candidates:
-            continue
-        partner = pick_partner(a, candidates)
-        if partner:
-            create_pair(a, partner)
-            used.add(a); used.add(partner)
+    # Cross-pair to fix imbalances (both directions)
+    used = set()
+    for primary, secondary in ((eu_left, us_left), (us_left, eu_left)):
+        for a in list(primary):
+            if a in used:
+                continue
+            candidates = [b for b in secondary if b not in used]
+            if not candidates:
+                continue
+            partner = pick_partner(a, candidates)
+            if partner:
+                create_pair(a, partner)
+                used.add(a); used.add(partner)
 
 # -------------------------
 # AFTER creating auto matches, recompute posting lists and leftovers cleanly
